@@ -2617,15 +2617,10 @@ verifyIconLibrary <- function(library) {
 #'
 #' Result is string of <rect> objects, a la `symbolSvg()`
 #'
-#' @param dashArray
-#' @param width
-#' @param height
-#' @param color
+#' @param dashArray Dash pattern
 #'
-#' @returns
+#' @returns <rect> object string
 #' @export
-#'
-#' @examples
 makeDashElement <- function(dashArray = "none",
                             id = "rect",
                             strokeWidth,
@@ -2723,36 +2718,8 @@ makeDashElement <- function(dashArray = "none",
   }
   return(rect_plot)
 }
-#
-#
-# makeSymbolDashElement <- function(shape = "rect", width, height = width, color,
-#                               fillColor = color, opacity = 1, fillOpacity = opacity, dashArray = "none", ...) {
-#   # print(list(...))
-#   stopifnot(is.numeric(width) & is.numeric(height))
-#   stopifnot(is.numeric(opacity) & is.numeric(fillOpacity))
-#   stopifnot(!is.na(shape))
-#   if (shape == "rect") {
-#     svg <- makeDashElement(shape = shape,  width = width, height = height,
-#                      color = color, fillColor = fillColor, opacity = opacity,
-#                      fillOpacity = fillOpacity, dashArray = dashArray, ...)
-#   } else {
-#     stop('Argument "shape" is invalid. Shape must be `rect`.')
-#   }
-#   svg
-# }
 
-# makeDashSymbol <- function(shape, width, height = width, color, fillColor = color,
-#                        opacity = 1, fillOpacity = opacity, dashArray = "none", ...) {
-#   svg <- makeSymbolElement(shape = shape, width, height = height,
-#                            color = color, fillColor = fillColor, opacity = opacity,
-#                            fillOpacity = fillOpacity, dashArray = dashArray, ...)
-#   strokeWidth <- 1
-#   if ( 'stroke-width' %in% names(list(...)) ) {
-#     strokeWidth <- list(...)[['stroke-width']]
-#   }
-#   makeSvgUri(svg = svg, width = width, height = height,
-#              strokeWidth = strokeWidth)
-# }
+# This function is needed because when multiple rect objects come together to make a single object symbol, the <...> don't convert correctly. Should be fixed at some point, but not important right now.
 correct_gtlt <-  function(x){
   x <- stringr::str_replace_all(x, "%26lt%3B", "%3C")
   x <- stringr::str_replace_all(x, "%26gt%3B", "%3E")

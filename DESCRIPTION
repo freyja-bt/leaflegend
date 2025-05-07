@@ -18,7 +18,7 @@ Imports:
     stats, 
     base64enc,
     htmlwidgets
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.2
 URL: https://leaflegend.delveds.com, https://github.com/tomroh/leaflegend
 BugReports: https://github.com/tomroh/leaflegend/issues
 Suggests: 
