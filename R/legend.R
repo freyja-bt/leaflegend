@@ -220,54 +220,59 @@ addLegendImage <- function(
 #' @export
 #'
 makeSymbol <- function(shape, width, height = width, color, fillColor = color,
-                       opacity = 1, fillOpacity = opacity, ...) {
+                       opacity = 1, fillOpacity = opacity, dashArray = "none", ...) {
   svg <- makeSymbolElement(shape = shape, width, height = height,
     color = color, fillColor = fillColor, opacity = opacity,
-    fillOpacity = fillOpacity, ...)
+    fillOpacity = fillOpacity, dashArray = dashArray, ...)
   strokeWidth <- 1
   if ( 'stroke-width' %in% names(list(...)) ) {
     strokeWidth <- list(...)[['stroke-width']]
   }
+  if (dashArray != "none"){
+   correct_gtlt(makeSvgUri(svg = svg, width = width, height = height,
+               strokeWidth = strokeWidth))
+  } else {
   makeSvgUri(svg = svg, width = width, height = height,
     strokeWidth = strokeWidth)
-}
+  }
+  }
 makeSymbolElement <- function(shape, width, height = width, color,
-  fillColor = color, opacity = 1, fillOpacity = opacity, ...) {
+  fillColor = color, opacity = 1, fillOpacity = opacity, dashArray = "none", ...) {
+  # print(list(...))
   stopifnot(is.numeric(width) & is.numeric(height))
   stopifnot(is.numeric(opacity) & is.numeric(fillOpacity))
   stopifnot(!is.na(shape))
   if (shape %in% availableShapes()[['default']]) {
     svg <- symbolSvg(shape = shape,  width = width, height = height,
       color = color, fillColor = fillColor, opacity = opacity,
-      fillOpacity = fillOpacity, ...)
+      fillOpacity = fillOpacity, dashArray = dashArray, ...)
   } else if (shape %in% availableShapes()[['pch']] || shape %in%
       (seq_along(availableShapes()[['pch']]) - 1)) {
     svg <- pchSvg(shape = shape,  width = width, height = height,
       color = color, fillColor = fillColor, opacity = opacity,
-      fillOpacity = fillOpacity, ...)
+      fillOpacity = fillOpacity, dashArray = dashArray, ...)
   } else {
     stop('Argument "shape" is invalid. See `availableShapes()`.')
   }
   svg
 }
 symbolSvg <- function(shape, width, height, color, fillColor, opacity,
-  fillOpacity, ...) {
+  fillOpacity, dashArray = "none", ...) {
   strokeWidth <- 1
   if ( 'stroke-width' %in% names(list(...)) ) {
     strokeWidth <- list(...)[['stroke-width']]
   }
   switch(
     shape,
-    'rect' = htmltools::tags$rect(
+    'rect' = makeDashElement(
+      dashArray = dashArray,
       id = 'rect',
-      x = strokeWidth,
-      y = strokeWidth,
       height = height,
       width = width,
-      stroke = color,
-      fill = fillColor,
-      'stroke-opacity' = opacity,
-      'fill-opacity' = fillOpacity,
+      color = color,
+      fillColor = fillColor,
+      opacity = opacity,
+      fillOpacity = fillOpacity,
       ...
     ),
     'circle' = htmltools::tags$circle(
@@ -355,6 +360,7 @@ symbolSvg <- function(shape, width, height, color, fillColor, opacity,
       stroke = color,
       'stroke-opacity' = opacity,
       'fill-opacity' = fillOpacity,
+      'stroke-dasharray' = dashArray,
       ...
     ),
     'polygon' = htmltools::tags$polygon(
@@ -2233,6 +2239,7 @@ addLegendLine <- function(map,
                           group = NULL,
                           className = 'info legend leaflet-control',
                           data = leaflet::getMapData(map),
+                          dashArray = "none",
                           ...) {
   shape <- 'rect'
   values <- parseValues(values = values, data = data)
@@ -2256,7 +2263,9 @@ addLegendLine <- function(map,
                  fillColor = colors,
                  opacity = opacity,
                  fillOpacity = fillOpacity,
-                 `stroke-width` = 0)
+                 `stroke-width` = 0,
+                 dashArray = dashArray
+                 )
   addLegendImage(map, images = symbols,
                  labels = labels,
                  title = title, labelStyle = labelStyle,
@@ -2601,4 +2610,151 @@ verifyIconLibrary <- function(library) {
   if (length(bad) > 0) {
     stop("Invalid icon library names: ", paste(unique(bad), collapse = ", "))
   }
+}
+
+
+#' Create dashed rectangle objects for legends
+#'
+#' Result is string of <rect> objects, a la `symbolSvg()`
+#'
+#' @param dashArray
+#' @param width
+#' @param height
+#' @param color
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+makeDashElement <- function(dashArray = "none",
+                            id = "rect",
+                            strokeWidth,
+                            height,
+                            width,
+                            color,
+                            fillColor,
+                            opacity,
+                            fillOpacity,
+                            verbose = FALSE,
+                            ...) {
+  strokeWidth <- 1
+  if ( 'stroke-width' %in% names(list(...)) ) {
+    strokeWidth <- list(...)[['stroke-width']]
+  }
+
+  if (dashArray == "none") {
+    rect_plot <- htmltools::tags$rect(
+      id = id,
+      x = strokeWidth,
+      y = strokeWidth,
+      height = height,
+      width = width,
+      fill = fillColor,
+      opacity = opacity,
+      "stroke-width" = strokeWidth,
+      "fill-opacity" = fillOpacity,
+      ...
+    )
+  } else {
+    brks <- unlist(stringr::str_extract_all(dashArray, "\\b\\d+\\b"))
+
+    if (brks[1] == "0" & brks[length(brks)] == "0") {
+      starttype <- "gap"
+      brks <- brks[2:(length(brks) - 1)]
+    } else {
+      starttype <- "dash"
+    }
+
+    tbrks <- sum(as.numeric(brks))
+
+    total_passes <- ceiling(width / tbrks)
+
+    long_brks <- as.numeric(rep(brks, total_passes))
+
+    include_indices <- which(cumsum(long_brks)<=width)
+    long_brks <- c(long_brks[include_indices], max(0, width-cumsum(long_brks)[max(include_indices)]))
+
+    rect_plot <- ""
+    k <- 0
+    # while(k <= width){
+    for (i in seq_along(long_brks)) {
+      if(verbose) message(paste(i, k))
+      if (starttype == "gap") {
+        vvv <- 1
+      } else {
+        vvv <- 0
+      }
+
+      if (i %% 2 == vvv) {
+        k <- k + long_brks[i]
+        if (k >= width) {
+          break
+        }
+      } else {
+        if(verbose) message((long_brks[i] + k) - width)
+        if(verbose) message(k+long_brks[i])
+        next_plot <- htmltools::tags$rect(
+          id = "id",
+          x = strokeWidth + k,
+          y = strokeWidth,
+          height = height,
+          width = long_brks[i],
+          fill = fillColor,
+          color = color,
+          opacity = opacity,
+          "stroke-width" = strokeWidth,
+          "fill-opacity" = fillOpacity,
+          ...
+        )
+
+
+
+        k <- k+long_brks[i]
+        if(verbose) message(k)
+        rect_plot <- paste(rect_plot, next_plot)
+
+        if (k >= width) {
+          break
+        }
+      }
+    }
+
+    # }
+  }
+  return(rect_plot)
+}
+#
+#
+# makeSymbolDashElement <- function(shape = "rect", width, height = width, color,
+#                               fillColor = color, opacity = 1, fillOpacity = opacity, dashArray = "none", ...) {
+#   # print(list(...))
+#   stopifnot(is.numeric(width) & is.numeric(height))
+#   stopifnot(is.numeric(opacity) & is.numeric(fillOpacity))
+#   stopifnot(!is.na(shape))
+#   if (shape == "rect") {
+#     svg <- makeDashElement(shape = shape,  width = width, height = height,
+#                      color = color, fillColor = fillColor, opacity = opacity,
+#                      fillOpacity = fillOpacity, dashArray = dashArray, ...)
+#   } else {
+#     stop('Argument "shape" is invalid. Shape must be `rect`.')
+#   }
+#   svg
+# }
+
+# makeDashSymbol <- function(shape, width, height = width, color, fillColor = color,
+#                        opacity = 1, fillOpacity = opacity, dashArray = "none", ...) {
+#   svg <- makeSymbolElement(shape = shape, width, height = height,
+#                            color = color, fillColor = fillColor, opacity = opacity,
+#                            fillOpacity = fillOpacity, dashArray = dashArray, ...)
+#   strokeWidth <- 1
+#   if ( 'stroke-width' %in% names(list(...)) ) {
+#     strokeWidth <- list(...)[['stroke-width']]
+#   }
+#   makeSvgUri(svg = svg, width = width, height = height,
+#              strokeWidth = strokeWidth)
+# }
+correct_gtlt <-  function(x){
+  x <- stringr::str_replace_all(x, "%26lt%3B", "%3C")
+  x <- stringr::str_replace_all(x, "%26gt%3B", "%3E")
+  return(x)
 }
